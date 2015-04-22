@@ -1,0 +1,149 @@
+#!/usr/bin/env sh
+
+LICENSE='
+"THE BEER-WARE LICENSE" (Revision 42):
+<souenzzo@gmail.com> wrote this file. As long as you retain this notice you
+can do whatever you want with this stuff. If we meet some day, and you think
+this stuff is worth it, you can buy me a beer in return Enzzo Cavallo.
+'
+
+DESKTOP_AUTOSTART="$HOME/.config/autostart/"
+LOGDIR="$HOME/.local/share/flash-tool/"
+MOZPLUGDIR="$HOME/.mozilla/plugins/"
+
+ABOUT="
+flash-tool aims to automate the download and extraction of the updated flash
+from official site and install it to local user mozilla plugins folder.
+
+Usage: $0 [OPTION]
+OPTION  Description
+  -u    Install/Update flash
+  -r    Remove any 'libflashplayer.so' installed on '$MOZPLUGDIR'
+
+  -e    Enable autoupdate on login
+  -d    Disable autoupdate on login
+  -s    Show if autoupdate on login is enabled. Returns 1 if not.
+
+  -c    Print current installed version. Return 1 if there's not.
+  -a    Print avalible version.          Retrun 3 case no internet conection.
+
+  -g    Run GUI.
+  -h    Show this help text
+  -v    Print name and version.
+
+Exit codes
+0 - Success
+1 - Warn                    (used on -c -s)
+2 - Invalid arguments       (no action)
+3 - No internet connection. (used on -u -a)
+"
+
+## Functions
+function flash_tool_avalible () {
+    URL='https://helpx.adobe.com/flash-player/kb/archived-flash-player-versions.html'
+    PARSE='11\.2\.[0-9][0-9][0-9]\.[0-9][0-9][0-9]'
+    curl -s $URL | grep -o "$PARSE" | sort | tail -1 || return 1 ## Internet fail
+    return 0                                                     ## Everything ok!
+}
+
+function flash_tool_current () {
+    [[ -a "$MOZPLUGDIR/libflashplayer.so" ]] || { echo 'Not installed' ; return 1 ; }
+    [[ -a "$LOGDIR/current.txt" ]]           || { echo 'Manually installed' ; return 2 ; }
+    CURRENT=$(cat "$LOGDIR/current.txt")
+    [[ $CURRENT ]]                           || { echo 'Manually installed' ; return 2 ; }
+    echo "$CURRENT"; return 0
+}
+
+function flash_tool_update () {
+    CURRENT=$(flash_tool_current)
+    AVALIBLE=$(flash_tool_avalible)
+    [[ "$AVALIBLE" == "$CURRENT" ]] && return 0 ## Everything ok!
+    URL="http://fpdownload.macromedia.com/get/flashplayer/pdc/$AVALIBLE/install_flash_player_11_linux.x86_64.tar.gz"
+    [[ -d "$MOZPLUGDIR" ]] || mkdir -p "$MOZPLUGDIR"
+    curl -s "$URL" | tar -x -z -C "$MOZPLUGDIR" "libflashplayer.so" || return 3 ## Internet fail
+    [[ -d "$LOGIDR" ]] || mkdir -p "$LOGDIR"
+    echo "$AVALIBLE" > "$LOGDIR/current.txt"
+    echo "$(date) @ $AVALIBLE" >> "$LOGDIR/versions.log"
+    return 0
+}
+
+function flash_tool_remove () {
+    [[ -a "$MOZPLUGDIR/libflashplayer.so" ]] && rm "$MOZPLUGDIR/libflashplayer.so"
+    [[ -a "$LOGDIR/current.txt" ]] && echo > "$LOGDIR/current.txt"
+    return 0
+}
+
+
+function flash_tool_enable () {
+## I'm looking for update on every firefox launch, but have no idea how to do that!
+    [[ -d "$DESKTOP_AUTOSTART" ]] || mkdir -p "$DESKTOP_AUTOSTART"
+    echo "[Desktop Entry]
+Type=Application
+Name=Flash tool
+Comment=Auto update flashplugin on login
+Exec=flash-tool -u
+" > "$DESKTOP_AUTOSTART/flash-tool.desktop"
+    return 0
+}
+
+function flash_tool_disable () {
+    [[ -a "$DESKTOP_AUTOSTART/flash-tool.desktop" ]] && rm "$DESKTOP_AUTOSTART/flash-tool.desktop"
+    return 0
+}
+
+function flash_tool_status () {
+    [[ -a "$DESKTOP_AUTOSTART/flash-tool.desktop" ]] && return 0
+    return 1
+}
+
+## GUI
+function flash_tool_gui () {
+    while [[ "$ANS" != "Exit" ]]; do
+        CURRENT="Installed: $(flash_tool_current)"
+        if [[ "$?" == "0" ]] ; then
+            flash_tool_update ## If it's installed, update it!
+            CURRENT="Installed: $(flash_tool_current)"
+            SWITCH='Remove'
+        else
+            SWITCH='Install'
+            CURRENT='Not installed.'
+        fi
+        ANS=$(zenity --title 'Flash tool' --height 220 --list \
+--text "Welcome to flash-tool!
+$CURRENT
+What do you wanna to do?" \
+        --radiolist  \
+        --column ' ' --column 'Action' \
+          FALSE      "$SWITCH"    \
+          FALSE      "Exit"       )
+        [[ "$?" == "1" ]] && return 0
+        case "$ANS" in
+            'Install')
+                flash_tool_enable
+                flash_tool_update
+                ;;
+            'Remove')
+                flash_tool_remove
+                flash_tool_disable
+                ;;
+            'Exit')
+                return 0
+                ;;
+       esac
+    done
+}
+
+## Main
+[[ "$1" == "-a" ]] && { flash_tool_avalible; exit; }
+[[ "$1" == "-c" ]] && { flash_tool_current;  exit; }
+[[ "$1" == "-u" ]] && { flash_tool_update;   exit; }
+[[ "$1" == "-r" ]] && { flash_tool_remove;   exit; }
+[[ "$1" == "-e" ]] && { flash_tool_enable;   exit; }
+[[ "$1" == "-d" ]] && { flash_tool_disable;  exit; }
+[[ "$1" == "-s" ]] && { flash_tool_status;   exit; }
+[[ "$1" == "-g" ]] && { flash_tool_gui;      exit; }
+echo "$ABOUT"
+exit 2
+
+
+

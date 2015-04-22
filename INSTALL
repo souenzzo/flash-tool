@@ -1,0 +1,24 @@
+Dependences
+===========
+* UNIX dependences 
+    coreutils or equivalent (tail date echo sort cat mkdir rm env touch)
+    grep      or equivalent (grep)
+    bash      or equivalent (sh)
+* Other dependences
+    tar       or equivalent (tar)
+    curl      or equivalent (curl)
+    zenity    or rquivalent (zenity)
+I have just tested with GNU ones.
+
+
+Installation of CLI
+==================
+Copy flash-tool to any folder in your PATH variable and make it executable.
+
+Installation of GUI
+==================
+
+Install zenity and trow flash-tool.desktop in /usr/share/applications/
+or ~/.local/share/applications
+
+

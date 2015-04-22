@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Flash Tool
+Comment=Update and configure flash-tool
+Exec=flash-tool -g
